@@ -1,10 +1,13 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:pacel_trans_app/color_themes.dart';
 
 final primaryColor = new ColorTheme();
 
 class PollBookingPage extends StatefulWidget {
-  const PollBookingPage({super.key});
+  final String id;
+  const PollBookingPage({super.key, required this.id});
 
   @override
   State<PollBookingPage> createState() => _PollBookingPageState();
@@ -14,6 +17,8 @@ class _PollBookingPageState extends State<PollBookingPage> {
   int _selectedIndex = 0;
   int _selectedPackageSizeIndex = 0;
   bool _isChecked = false;
+  double estimatedAmount = 0.0;
+  bool isLoading = false;
 
   void _onCheckboxChanged(bool? value) {
     setState(() {
@@ -44,6 +49,82 @@ class _PollBookingPageState extends State<PollBookingPage> {
     setState(() {
       _selectedPackageSizeIndex = index;
     });
+  }
+
+  Future<void> requestRoutePoll({
+    required double amount,
+    required String companyID,
+    required bool isBreakable,
+    required String orderNo,
+    required String orderStatus,
+    required String packageSize,
+    required String packageType,
+    required bool paymentStatus,
+    required String paymentType,
+    required String routeId,
+    required String userId,
+  }) async {
+    try {
+      setState(() {
+        isLoading = true;
+      });
+      await FirebaseFirestore.instance.collection('LogisticOrders').add({
+        'amount': amount,
+        'approvalStatus': false,
+        'companyID': companyID,
+        'isBreakable': isBreakable,
+        'orderNo': orderNo,
+        'orderStatus': orderStatus,
+        'packageSize': packageSize,
+        'packageType': packageType,
+        'paymentStatus': paymentStatus,
+        'paymentType': paymentType,
+        'routeId': routeId,
+        'userId': userId,
+      }).then((value) => {
+            setState(() {
+              isLoading = false;
+            }),
+            showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: Text('Request Status'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                          'Initial order is placed successifully do checkin and payments within 1hour.'),
+                      SizedBox(
+                        height: 10.0,
+                      ),
+                      Column(
+                        children: [
+                          Text(
+                            'invoice number',
+                            style: TextStyle(fontSize: 18.0),
+                          ),
+                          Text(value.id),
+                        ],
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: Text('OK'),
+                    ),
+                  ],
+                );
+              },
+            )
+          });
+      print('Route poll added successfully');
+    } catch (e) {
+      print('Failed to add route poll: $e');
+    }
   }
 
   @override
@@ -120,12 +201,12 @@ class _PollBookingPageState extends State<PollBookingPage> {
                 Text("Breakable items")
               ],
             ),
-            Row(
-              children: [
-                Checkbox(value: this._isChecked, onChanged: _onCheckboxChanged),
-                Text("No prohibited items")
-              ],
-            ),
+            // Row(
+            //   children: [
+            //     Checkbox(value: this._isChecked, onChanged: _onCheckboxChanged),
+            //     Text("No prohibited items")
+            //   ],
+            // ),
             SizedBox(
               height: 20,
             ),
@@ -197,16 +278,38 @@ class _PollBookingPageState extends State<PollBookingPage> {
                 ],
               ),
             ),
-            SizedBox(height: 20,),
+            SizedBox(
+              height: 20,
+            ),
             MaterialButton(
               elevation: 0,
               height: 55,
               color: color.primaryColor,
-              onPressed: () {},
-              child: Text(
-                "Place order",
-                style: TextStyle(color: Colors.white,fontWeight: FontWeight.bold),
-              ),
+              onPressed: () {
+                User? user = FirebaseAuth.instance.currentUser;
+
+                requestRoutePoll(
+                    amount: estimatedAmount,
+                    companyID: "",
+                    isBreakable: _isChecked,
+                    orderNo: "jucudbcucb",
+                    orderStatus: "pending",
+                    packageSize: packageSize[_selectedPackageSizeIndex],
+                    packageType: packageTypeList[_selectedIndex],
+                    paymentStatus: false,
+                    paymentType: "cash",
+                    routeId: widget.id,
+                    userId: user!.uid);
+              },
+              child: (!isLoading)
+                  ? Text(
+                      "Place order",
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold),
+                    )
+                  : CircularProgressIndicator(
+                      color: Colors.white,
+                    ),
             ),
           ],
         ),

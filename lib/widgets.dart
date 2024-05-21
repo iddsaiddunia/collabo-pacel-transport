@@ -3,10 +3,7 @@ import 'package:pacel_trans_app/color_themes.dart';
 
 class HistoryCard extends StatelessWidget {
   final Function()? isPressed;
-  const HistoryCard({
-    super.key,
-    required this.isPressed
-  });
+  const HistoryCard({super.key, required this.isPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +15,7 @@ class HistoryCard extends StatelessWidget {
       decoration: const BoxDecoration(
         border: Border(
           bottom:
-          BorderSide(width: 1, color: Color.fromARGB(255, 224, 224, 224)),
+              BorderSide(width: 1, color: Color.fromARGB(255, 224, 224, 224)),
         ),
       ),
       child: Row(
@@ -40,8 +37,10 @@ class HistoryCard extends StatelessWidget {
                       Radius.circular(25),
                     ),
                   ),
-                  child: Icon(Icons.fire_truck, color: Colors.black54,)
-              ),
+                  child: Icon(
+                    Icons.fire_truck,
+                    color: Colors.black54,
+                  )),
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: const Column(
@@ -49,14 +48,21 @@ class HistoryCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text("GEJFKKKLDLLLD",
-                        style: TextStyle(fontWeight: FontWeight.w600,fontSize: 12)),
-                    Text("Dar - Mwanza",style: TextStyle(fontSize: 12)),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 12)),
+                    Text("Dar - Mwanza", style: TextStyle(fontSize: 12)),
                   ],
                 ),
               ),
             ],
           ),
-          IconButton(onPressed: isPressed, icon: Icon(Icons.arrow_forward_ios,size: 18,color: Colors.black54,))
+          IconButton(
+              onPressed: isPressed,
+              icon: Icon(
+                Icons.arrow_forward_ios,
+                size: 18,
+                color: Colors.black54,
+              ))
         ],
       ),
     );
@@ -64,9 +70,22 @@ class HistoryCard extends StatelessWidget {
 }
 
 class PollBox extends StatelessWidget {
+  final String truckInfo;
+  final String companyName;
+  final DateTime depatureDate;
+  final String from;
+  final String to;
+  final double remainingCapacity;
   final Function()? ontap;
-  const PollBox({super.key,
-    required this.ontap
+  const PollBox({
+    super.key,
+    required this.ontap,
+    required this.truckInfo,
+    required this.companyName,
+    required this.depatureDate,
+    required this.from,
+    required this.to,
+    required this.remainingCapacity,
   });
 
   @override
@@ -77,68 +96,107 @@ class PollBox extends StatelessWidget {
       height: 120,
       decoration: BoxDecoration(
           color: Colors.white,
-              border: Border.all(width: 1, color: Colors.black12),
+          border: Border.all(width: 1, color: Colors.black12),
           borderRadius: BorderRadius.all(Radius.circular(10)),
-        boxShadow: [BoxShadow(
-          color: Colors.white10,
-              blurRadius: 2.0,
-          spreadRadius: 2.0
-        ),]
-      ),
-      child: Column(children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 2.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-              Text("Scania 124 456 DEF",style: TextStyle(fontSize: 11,fontWeight: FontWeight.w600),),
-              Text("DHL Logistics",style: TextStyle(fontSize: 11,fontWeight: FontWeight.w500),),
-
-            ],),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Depature",style: TextStyle(fontSize: 11,fontWeight: FontWeight.w500),),
-                Text("17 Apr 2024",style: TextStyle(fontSize: 11,fontWeight: FontWeight.w600),),
-
-              ],)
-          ],),
-        ),
-        Divider(),
-
+          boxShadow: [
+            BoxShadow(
+                color: Colors.white10, blurRadius: 2.0, spreadRadius: 2.0),
+          ]),
+      child: Column(
+        children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 2.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10.0, vertical: 2.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Dar es salaam",style: TextStyle(fontSize: 11,fontWeight: FontWeight.w600),),
-
-                    Text("Mwanza",style: TextStyle(fontSize: 11,fontWeight: FontWeight.w500),),
-
-                  ],),
+                    Text(
+                      truckInfo,
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      companyName,
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Ramaining Size",style: TextStyle(fontSize: 11,fontWeight: FontWeight.w500),),
-                    Text("17 Tons",style: TextStyle(fontSize: 11,fontWeight: FontWeight.w600),),
-
-                  ],),
+                    Text(
+                      "Depature",
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                    ),
+                    Text(
+                      depatureDate.toString(),
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                )
+              ],
+            ),
+          ),
+          Divider(),
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10.0, vertical: 2.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      from,
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      to,
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Ramaining Capacity",
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                    ),
+                    Text(
+                      "${remainingCapacity.toString()} Tons",
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
                 MaterialButton(
                   color: color.primaryColor,
-                  onPressed: ontap, child: Text("Proceed",style: TextStyle(fontSize: 12,fontWeight: FontWeight.w600, color: Colors.white),),elevation: 0,)
-              ],),
+                  onPressed: ontap,
+                  child: Text(
+                    "Proceed",
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white),
+                  ),
+                  elevation: 0,
+                )
+              ],
+            ),
           ),
-
-
-      ],)
-      ,
+        ],
+      ),
     );
   }
 }
-

@@ -1,12 +1,13 @@
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:pacel_trans_app/auth/poll_booking.dart';
 import 'package:pacel_trans_app/color_themes.dart';
+import 'package:pacel_trans_app/models/route.dart';
 import 'package:pacel_trans_app/widgets.dart';
 
-final color = new ColorTheme();
+final color = ColorTheme();
 
 class RoutesPollsPage extends StatefulWidget {
   const RoutesPollsPage({super.key});
@@ -16,6 +17,9 @@ class RoutesPollsPage extends StatefulWidget {
 }
 
 class _RoutesPollsPageState extends State<RoutesPollsPage> {
+  final CollectionReference routesCollection =
+      FirebaseFirestore.instance.collection('RoutesPolls');
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -39,7 +43,7 @@ class _RoutesPollsPageState extends State<RoutesPollsPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
+                        const SizedBox(
                           height: 2,
                         ),
                         Column(
@@ -109,27 +113,53 @@ class _RoutesPollsPageState extends State<RoutesPollsPage> {
                             topRight: Radius.circular(20))),
                     child: Padding(
                       padding: const EdgeInsets.all(15.0),
-                      child: ListView(
-                        children: [
-                          PollBox(
-                            ontap: () {
-                              Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (context) => PollBookingPage(),),);
-                            },
-                          ),
-                          PollBox(
-                            ontap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => PollBookingPage(),),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
+                      child: StreamBuilder<Object>(
+                          stream: routesCollection.snapshots(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError) {
+                              return Center(
+                                  child: Text('Error: ${snapshot.error}'));
+                            }
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Center(
+                                  child: CircularProgressIndicator());
+                            }
+
+                            if (!snapshot.hasData || snapshot.data == null) {
+                              return const Center(
+                                  child: Text('No data available'));
+                            }
+
+                            // Explicitly cast snapshot.data to QuerySnapshot
+                            final QuerySnapshot querySnapshot =
+                                snapshot.data as QuerySnapshot;
+
+                            final routes = querySnapshot.docs.map((doc) {
+                              return Routes.fromDocument(doc);
+                            }).toList();
+                            return ListView.builder(
+                                itemCount: routes.length,
+                                itemBuilder: (context, index) {
+                                  return PollBox(
+                                    truckInfo: routes[index].trackInfo,
+                                    companyName: routes[index].companyName,
+                                    depatureDate: routes[index].departureTime.toDate(),
+                                    from: routes[index].from,
+                                    to: routes[index].to,
+                                    remainingCapacity: routes[index].remainingSpace,
+                                    ontap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              PollBookingPage(id:routes[index].id),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                });
+                          }),
                     ),
                   ),
                 )

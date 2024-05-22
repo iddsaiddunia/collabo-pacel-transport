@@ -483,14 +483,74 @@ class _DashboardPageState extends State<DashboardPage> {
                               ),
                             ),
                           ),
-                          const CustomPage(
-                            content: Text('Page 2 Content'),
+                          CustomPage(
+                            content: Container(
+                              width: double.infinity,
+                              height: 240,
+                              // color: Colors.red,
+                              child: StreamBuilder<QuerySnapshot>(
+                                stream: FirebaseFirestore.instance
+                                    .collection('LogisticOrders')
+                                    .where('userId', isEqualTo: user.uid)
+                                    .snapshots(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasError) {
+                                    return Center(
+                                        child:
+                                            Text('Error: ${snapshot.error}'));
+                                  }
+
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  }
+
+                                  if (!snapshot.hasData ||
+                                      snapshot.data == null) {
+                                    return Center(
+                                        child: Text('No data available'));
+                                  }
+
+                                  final logisticOrders =
+                                      snapshot.data!.docs.map((doc) {
+                                    return LogisticOrder.fromDocument(doc);
+                                  }).toList();
+
+                                  return ListView.builder(
+                                    itemCount: logisticOrders.length,
+                                    itemBuilder: (context, index) {
+                                      if (logisticOrders[index].orderStatus ==
+                                          "pending") {
+                                        return SizedBox();
+                                      }
+
+                                      return HistoryCard(
+                                        orderNo: logisticOrders[index].orderNo,
+                                        from: logisticOrders[index].from,
+                                        to: logisticOrders[index].to,
+                                        isPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const DetailsPage(id: 1),
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
                           ),
                           const CustomPage(
-                            content: Text('Page 2 Content'),
+                            content: Text('No orders on-progress'),
                           ),
                           const CustomPage(
-                            content: Text('Page 2 Content'),
+                            content: Text('No orders delivered'),
                           ),
                         ],
                       ),

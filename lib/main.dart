@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:pacel_trans_app/nonAuth/login.dart';
 import 'package:pacel_trans_app/nonAuth/registration.dart';
 import 'package:pacel_trans_app/services/provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 void main() async{
@@ -17,6 +18,7 @@ void main() async{
       projectId: "collaborative-cargo", //paste your project id here
     ),
   );
+  await Permission.location.request();
   runApp(
     MultiProvider(
       providers: [

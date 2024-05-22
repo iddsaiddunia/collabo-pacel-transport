@@ -1,9 +1,16 @@
+// ignore_for_file: prefer_const_constructors
+
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:pacel_trans_app/auth/details.dart';
+import 'package:pacel_trans_app/auth/requests.dart';
+import 'package:pacel_trans_app/models/order.dart';
 import 'package:pacel_trans_app/widgets.dart';
 
 import '../color_themes.dart';
@@ -19,12 +26,24 @@ class _DashboardPageState extends State<DashboardPage> {
   PageController _pageController = PageController(initialPage: 0);
   int _selectedIndex = 0;
   List<String> tabsLength = ["All", "Pending", "On Delivery", "Delivered"];
-  // List<Widget> tabsPageList = [
-  //   All(),
-  //   pending(),
-  //   onDelivery(),
-  //   all(),
-  // ];
+  // late Timer _timer;
+  int _secondsRemaining = 3600; // 1 hour countdown
+  bool _isDisposed = false;
+  late Future<DocumentSnapshot> _latestRequestFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // _startCountdown();
+    _latestRequestFuture = fetchLatestRequest();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    // _timer.cancel();
+    super.dispose();
+  }
 
   void changeTabs(int index) {
     setState(() {
@@ -40,8 +59,62 @@ class _DashboardPageState extends State<DashboardPage> {
         .get();
   }
 
+  void copyToClipboard(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+  }
+
+  Future<DocumentSnapshot> fetchLatestRequest() async {
+    CollectionReference requestPolls =
+        FirebaseFirestore.instance.collection('LogisticOrders');
+
+    QuerySnapshot querySnapshot = await requestPolls
+        .orderBy('createdAt', descending: true)
+        .limit(1)
+        .get();
+
+    if (querySnapshot.docs.isNotEmpty) {
+      return querySnapshot.docs.first;
+    } else {
+      throw Exception('No requests found');
+    }
+  }
+
+  // void _startCountdown() {
+  //   _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+  //     if (_secondsRemaining > 0) {
+  //       setState(() {
+  //         _secondsRemaining--;
+  //       });
+  //     } else {
+  //       _timer.cancel();
+  //       _updateOrderStatus();
+  //     }
+  //   });
+  // }
+
+  Future<void> _updateOrderStatus() async {
+    DocumentSnapshot orderSnapshot = await FirebaseFirestore.instance
+        .collection('LogisticOrders')
+        .doc("sCdj7sxW5XYfBnjafr8j")
+        .get();
+
+    if (orderSnapshot.exists) {
+      var orderData = orderSnapshot.data() as Map<String, dynamic>;
+      if (orderData['orderStatus'] == 'pending') {
+        await FirebaseFirestore.instance
+            .collection('LogisticOrders')
+            .doc("sCdj7sxW5XYfBnjafr8j")
+            .update({'orderStatus': 'expired'});
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    var user = FirebaseAuth.instance.currentUser!;
+    int hours = _secondsRemaining ~/ 3600;
+    int minutes = (_secondsRemaining % 3600) ~/ 60;
+    int seconds = _secondsRemaining % 60;
     return Scaffold(
       backgroundColor: Colors.blue[50],
       body: SafeArea(
@@ -63,7 +136,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 ConnectionState.done) {
                               return Row(
                                 children: [
-                                  CircleAvatar(
+                                  const CircleAvatar(
                                     radius: 30,
                                     backgroundColor: Colors.white,
                                     child: Icon(Icons.person),
@@ -78,56 +151,230 @@ class _DashboardPageState extends State<DashboardPage> {
                                 ConnectionState.none) {
                               return const Text("No data");
                             }
-                            return Center(
-                                child: const CircularProgressIndicator());
+                            return const Center(
+                              child: CircleAvatar(
+                                radius: 30,
+                                backgroundColor: Colors.white,
+                                child: Icon(Icons.person),
+                              ),
+                            );
                           },
                         ),
-                        Icon(Icons.notifications),
+                        const Icon(Icons.notifications),
                       ],
                     ),
-                    SizedBox(
+                    const SizedBox(
                       height: 30.0,
                     ),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 18.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
                       child: Container(
                         width: double.infinity,
-                        height: 150.0,
+                        height: 190.0,
                         decoration: BoxDecoration(
-                            color: color.primaryColor,
-                            borderRadius:
-                                BorderRadius.all(Radius.circular(12))),
+                          color: color.primaryColor,
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(12),
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: FutureBuilder<DocumentSnapshot>(
+                            future: _latestRequestFuture,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return Center(
+                                    child: CircularProgressIndicator());
+                              } else if (snapshot.hasError) {
+                                return Center(
+                                    child: Text('Error: ${snapshot.error}'));
+                              } else if (!snapshot.hasData ||
+                                  snapshot.data == null) {
+                                return Center(child: Text('No requests found'));
+                              } else {
+                                var requestData = snapshot.data!.data()
+                                    as Map<String, dynamic>;
+                                return ListView(
+                                  children: [
+                                    Padding(
+                                      padding: EdgeInsets.all(8.0),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            "New Request",
+                                            style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                          GestureDetector(
+                                            onTap: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) =>
+                                                      RequestPage(),
+                                                ),
+                                              );
+                                            },
+                                            child: Text(
+                                              "view all",
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          )
+                                        ],
+                                      ),
+                                    ),
+                                    Divider(),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          "OrderNo- ",
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11),
+                                        ),
+                                        Text(
+                                          requestData['orderNo'],
+                                          style: TextStyle(
+                                            color: Color.fromARGB(
+                                                255, 228, 228, 228),
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      // mainAxisAlignment:
+                                      //     MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          "Expiring in- ",
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11),
+                                        ),
+                                        Container(
+                                          padding: EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 2),
+                                          decoration: BoxDecoration(
+                                              color: Colors.white),
+                                          // child: Text(
+                                          //   '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
+                                          //   style: TextStyle(
+                                          //       color: Color.fromARGB(
+                                          //           255, 75, 75, 75),
+                                          //       fontWeight: FontWeight.bold),
+                                          // ),
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          "amount- ",
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11),
+                                        ),
+                                        Text(
+                                          "${requestData['amount']} Tsh",
+                                          style: TextStyle(
+                                              color: Color.fromARGB(
+                                                  255, 228, 228, 228),
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          "Campany location- ",
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11),
+                                        ),
+                                        Text(
+                                          "Mabibo mwisho",
+                                          style: TextStyle(
+                                              color: Color.fromARGB(
+                                                  255, 228, 228, 228),
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          "Campany contacts- ",
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11),
+                                        ),
+                                        GestureDetector(
+                                          onTap: () {
+                                            copyToClipboard("+255897464044");
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    'Text copied to clipboard'),
+                                              ),
+                                            );
+                                          },
+                                          child: Text(
+                                            "+255897464044",
+                                            style: TextStyle(
+                                                color: Color.fromARGB(
+                                                    255, 228, 228, 228),
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  ],
+                                );
+                              }
+                            },
+                          ),
+                        ),
                       ),
                     )
                   ],
                 ),
               ),
             ),
-            SizedBox(
+            const SizedBox(
               height: 30.0,
             ),
             Expanded(
               child: Container(
                 width: double.infinity,
-                padding: EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(25),
-                        topRight: Radius.circular(25))),
+                padding: const EdgeInsets.all(20),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(25),
+                    topRight: Radius.circular(25),
+                  ),
+                ),
                 child: Column(
                   children: [
                     Container(
                       width: double.infinity,
                       height: 55.0,
-                      padding: EdgeInsets.symmetric(horizontal: 20.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
                       decoration: BoxDecoration(
                           // color: Colors.blue[50],
-                          borderRadius: BorderRadius.all(
+                          borderRadius: const BorderRadius.all(
                             Radius.circular(30),
                           ),
                           border: Border.all(width: 1, color: Colors.black12)),
-                      child: TextField(
+                      child: const TextField(
                         // controller: emailController,
                         decoration: InputDecoration(
                             suffixIcon: Icon(Icons.search),
@@ -136,13 +383,13 @@ class _DashboardPageState extends State<DashboardPage> {
                             border: InputBorder.none),
                       ),
                     ),
-                    SizedBox(
+                    const SizedBox(
                       height: 20,
                     ),
                     Container(
                       width: double.infinity,
                       height: 60,
-                      padding: EdgeInsets.symmetric(vertical: 3.0),
+                      padding: const EdgeInsets.symmetric(vertical: 3.0),
                       // color: Colors.black12,
                       child: ListView.builder(
                         itemCount: tabsLength.length,
@@ -178,37 +425,71 @@ class _DashboardPageState extends State<DashboardPage> {
                               width: double.infinity,
                               height: 240,
                               // color: Colors.red,
-                              child: ListView(
-                                children: [
-                                  HistoryCard(
-                                    isPressed: () {
-                                      Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
+                              child: StreamBuilder<QuerySnapshot>(
+                                stream: FirebaseFirestore.instance
+                                    .collection('LogisticOrders')
+                                    .where('userId', isEqualTo: user.uid)
+                                    .snapshots(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasError) {
+                                    return Center(
+                                        child:
+                                            Text('Error: ${snapshot.error}'));
+                                  }
+
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  }
+
+                                  if (!snapshot.hasData ||
+                                      snapshot.data == null) {
+                                    return Center(
+                                        child: Text('No data available'));
+                                  }
+
+                                  final logisticOrders =
+                                      snapshot.data!.docs.map((doc) {
+                                    return LogisticOrder.fromDocument(doc);
+                                  }).toList();
+
+                                  return ListView.builder(
+                                    itemCount: logisticOrders.length,
+                                    itemBuilder: (context, index) {
+                                      if (logisticOrders[index].orderStatus ==
+                                          "init") {
+                                        return SizedBox();
+                                      }
+
+                                      return HistoryCard(
+                                        orderNo: logisticOrders[index].orderNo,
+                                        from: logisticOrders[index].from,
+                                        to: logisticOrders[index].to,
+                                        isPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
                                               builder: (context) =>
-                                                  DetailsPage(id: 1)));
+                                                  const DetailsPage(id: 1),
+                                            ),
+                                          );
+                                        },
+                                      );
                                     },
-                                  ),
-                                  HistoryCard(
-                                    isPressed: () {
-                                      Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                              builder: (context) =>
-                                                  DetailsPage(id: 2)));
-                                    },
-                                  ),
-                                ],
+                                  );
+                                },
                               ),
                             ),
                           ),
-                          CustomPage(
+                          const CustomPage(
                             content: Text('Page 2 Content'),
                           ),
-                          CustomPage(
+                          const CustomPage(
                             content: Text('Page 2 Content'),
                           ),
-                          CustomPage(
+                          const CustomPage(
                             content: Text('Page 2 Content'),
                           ),
                         ],
@@ -244,15 +525,15 @@ class Tabs extends StatelessWidget {
       onTap: isPressed,
       child: Container(
         height: 40.0,
-        padding: EdgeInsets.symmetric(vertical: 6, horizontal: 15),
-        margin: EdgeInsets.all(5),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 15),
+        margin: const EdgeInsets.all(5),
         decoration: BoxDecoration(
             color: (index == selectedIndex) ? Colors.red[200] : null,
             border: Border.all(
               width: 1,
               color: Colors.black12,
             ),
-            borderRadius: BorderRadius.all(Radius.circular(20))),
+            borderRadius: const BorderRadius.all(Radius.circular(20))),
         child: Center(
             child: Text(
           title,

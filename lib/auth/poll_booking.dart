@@ -7,7 +7,14 @@ final primaryColor = new ColorTheme();
 
 class PollBookingPage extends StatefulWidget {
   final String id;
-  const PollBookingPage({super.key, required this.id});
+  final String from;
+  final String to;
+  const PollBookingPage({
+    super.key,
+    required this.id,
+    required this.from,
+    required this.to,
+  });
 
   @override
   State<PollBookingPage> createState() => _PollBookingPageState();
@@ -17,7 +24,7 @@ class _PollBookingPageState extends State<PollBookingPage> {
   int _selectedIndex = 0;
   int _selectedPackageSizeIndex = 0;
   bool _isChecked = false;
-  double estimatedAmount = 0.0;
+  double estimatedAmount = 1650.0;
   bool isLoading = false;
 
   void _onCheckboxChanged(bool? value) {
@@ -55,6 +62,8 @@ class _PollBookingPageState extends State<PollBookingPage> {
     required double amount,
     required String companyID,
     required bool isBreakable,
+    required String from,
+    required String to,
     required String orderNo,
     required String orderStatus,
     required String packageSize,
@@ -63,6 +72,7 @@ class _PollBookingPageState extends State<PollBookingPage> {
     required String paymentType,
     required String routeId,
     required String userId,
+    required DateTime createdAt,
   }) async {
     try {
       setState(() {
@@ -73,6 +83,8 @@ class _PollBookingPageState extends State<PollBookingPage> {
         'approvalStatus': false,
         'companyID': companyID,
         'isBreakable': isBreakable,
+        'from': from,
+        'to': to,
         'orderNo': orderNo,
         'orderStatus': orderStatus,
         'packageSize': packageSize,
@@ -81,7 +93,9 @@ class _PollBookingPageState extends State<PollBookingPage> {
         'paymentType': paymentType,
         'routeId': routeId,
         'userId': userId,
+        'createdAt': createdAt,
       }).then((value) => {
+            value.update({'orderNo': value.id}),
             setState(() {
               isLoading = false;
             }),
@@ -233,7 +247,7 @@ class _PollBookingPageState extends State<PollBookingPage> {
                       ),
                       Row(children: [
                         Text(
-                          "30,000 Tsh",
+                          "${estimatedAmount.toString()} Tsh",
                           style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: color.primaryColor),
@@ -289,17 +303,21 @@ class _PollBookingPageState extends State<PollBookingPage> {
                 User? user = FirebaseAuth.instance.currentUser;
 
                 requestRoutePoll(
-                    amount: estimatedAmount,
-                    companyID: "",
-                    isBreakable: _isChecked,
-                    orderNo: "jucudbcucb",
-                    orderStatus: "pending",
-                    packageSize: packageSize[_selectedPackageSizeIndex],
-                    packageType: packageTypeList[_selectedIndex],
-                    paymentStatus: false,
-                    paymentType: "cash",
-                    routeId: widget.id,
-                    userId: user!.uid);
+                  amount: estimatedAmount,
+                  companyID: "",
+                  isBreakable: _isChecked,
+                  from: widget.from,
+                  to: widget.to,
+                  orderNo: "",
+                  orderStatus: "init",
+                  packageSize: packageSize[_selectedPackageSizeIndex],
+                  packageType: packageTypeList[_selectedIndex],
+                  paymentStatus: false,
+                  paymentType: "cash",
+                  routeId: widget.id,
+                  userId: user!.uid,
+                  createdAt: DateTime.now(),
+                );
               },
               child: (!isLoading)
                   ? Text(

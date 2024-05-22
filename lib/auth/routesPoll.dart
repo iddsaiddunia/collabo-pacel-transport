@@ -114,52 +114,55 @@ class _RoutesPollsPageState extends State<RoutesPollsPage> {
                     child: Padding(
                       padding: const EdgeInsets.all(15.0),
                       child: StreamBuilder<Object>(
-                          stream: routesCollection.snapshots(),
-                          builder: (context, snapshot) {
-                            if (snapshot.hasError) {
-                              return Center(
-                                  child: Text('Error: ${snapshot.error}'));
-                            }
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return const Center(
-                                  child: CircularProgressIndicator());
-                            }
+                        stream: routesCollection.snapshots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasError) {
+                            return Center(
+                                child: Text('Error: ${snapshot.error}'));
+                          }
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                                child: CircularProgressIndicator());
+                          }
 
-                            if (!snapshot.hasData || snapshot.data == null) {
-                              return const Center(
-                                  child: Text('No data available'));
-                            }
+                          if (!snapshot.hasData || snapshot.data == null) {
+                            return const Center(
+                                child: Text('No data available'));
+                          }
 
-                            // Explicitly cast snapshot.data to QuerySnapshot
-                            final QuerySnapshot querySnapshot =
-                                snapshot.data as QuerySnapshot;
+                          // Explicitly cast snapshot.data to QuerySnapshot
+                          final QuerySnapshot querySnapshot =
+                              snapshot.data as QuerySnapshot;
 
-                            final routes = querySnapshot.docs.map((doc) {
-                              return Routes.fromDocument(doc);
-                            }).toList();
-                            return ListView.builder(
-                                itemCount: routes.length,
-                                itemBuilder: (context, index) {
-                                  return PollBox(
-                                    truckInfo: routes[index].trackInfo,
-                                    companyName: routes[index].companyName,
-                                    depatureDate: routes[index].departureTime.toDate(),
-                                    from: routes[index].from,
-                                    to: routes[index].to,
-                                    remainingCapacity: routes[index].remainingSpace,
-                                    ontap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              PollBookingPage(id:routes[index].id),
-                                        ),
-                                      );
-                                    },
+                          final routes = querySnapshot.docs.map((doc) {
+                            return Routes.fromDocument(doc);
+                          }).toList();
+                          return ListView.builder(
+                            itemCount: routes.length,
+                            itemBuilder: (context, index) {
+                              return PollBox(
+                                truckInfo: routes[index].trackInfo,
+                                companyName: routes[index].companyName,
+                                depatureDate:
+                                    routes[index].departureTime.toDate(),
+                                from: routes[index].from,
+                                to: routes[index].to,
+                                remainingCapacity: routes[index].remainingSpace,
+                                ontap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          PollBookingPage(id: routes[index].id, from : routes[index].from, to : routes[index].to),
+                                    ),
                                   );
-                                });
-                          }),
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
                     ),
                   ),
                 )

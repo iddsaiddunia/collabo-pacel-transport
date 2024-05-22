@@ -3,7 +3,16 @@ import 'package:pacel_trans_app/color_themes.dart';
 
 class HistoryCard extends StatelessWidget {
   final Function()? isPressed;
-  const HistoryCard({super.key, required this.isPressed});
+  final String orderNo;
+  final String from;
+  final String to;
+  const HistoryCard({
+    super.key,
+    required this.isPressed,
+    required this.orderNo,
+    required this.from,
+    required this.to,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -43,14 +52,19 @@ class HistoryCard extends StatelessWidget {
                   )),
               Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text("GEJFKKKLDLLLD",
-                        style: TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 12)),
-                    Text("Dar - Mwanza", style: TextStyle(fontSize: 12)),
+                    Text(
+                      orderNo,
+                      style:
+                          TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                    ),
+                    Text(
+                      "${from} - ${to}",
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ],
                 ),
               ),

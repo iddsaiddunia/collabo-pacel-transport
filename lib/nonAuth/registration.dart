@@ -179,40 +179,80 @@ class _RegistrationPageState extends State<RegistrationPage> {
     setState(() {
       isLoading = true;
     });
-    final user =
-        await auth.createNewUser(emailController.text, passwordController.text);
-    if (user != null) {
-      await FirebaseFirestore.instance.collection('clients').doc(user.uid).set({
-        'username': usernameController.text.trim(),
-        'phone': phoneController.text.trim(),
-      });
+    if (emailController.text != "" ||
+        passwordController.text != "" ||
+        usernameController.text != "" ||
+        phoneController.text != "") {
+      if (passwordController.text == verifyController.text) {
+        if (passwordController.text.length < 6) {
+          setState(() {
+            isLoading = false;
+          });
+          _showToast(context, "password  should be of legth 6 and above");
+        } else {
+          final user = await auth.createNewUser(
+              emailController.text, passwordController.text);
+          if (user != null) {
+            await FirebaseFirestore.instance
+                .collection('clients')
+                .doc(user.uid)
+                .set({
+              'username': usernameController.text.trim(),
+              'phone': phoneController.text.trim(),
+            });
 
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Alert!'),
-            content: Text('user was created successifully.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => LoginPage(),
+            showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: Text('Alert!'),
+                  content: Text('user was created successifully.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LoginPage(),
+                          ),
+                        );
+                      },
+                      child: Text('OK'),
                     ),
-                  );
-                },
-                child: Text('OK'),
-              ),
-            ],
-          );
-        },
-      );
+                  ],
+                );
+              },
+            );
 
+            setState(() {
+              isLoading = false;
+            });
+          } else {
+            setState(() {
+              isLoading = false;
+            });
+            _showToast(context, "user was not created");
+          }
+        }
+      } else {
+        _showToast(context, "Password don't match ");
+      }
+    } else {
       setState(() {
         isLoading = false;
       });
+      _showToast(context, "Please fill all fields");
     }
+  }
+
+  void _showToast(BuildContext context, String message) {
+    final scaffold = ScaffoldMessenger.of(context);
+    scaffold.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        action: SnackBarAction(
+            label: 'UNDO', onPressed: scaffold.hideCurrentSnackBar),
+      ),
+    );
   }
 }

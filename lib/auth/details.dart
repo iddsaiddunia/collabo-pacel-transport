@@ -88,6 +88,7 @@ class _DetailsPageState extends State<DetailsPage> {
       LatLng(-6.7924, 39.2083); // Dar es Salaam coordinates
   List<LatLng> _polylineCoordinates = [];
   final String _apiKey = 'AIzaSyAjsJbodhou5nNntMWPdhRsWqz2h1Tgzoc';
+  bool _isLoading = true;
 
   Future<void> _getPolyline() async {
     const String _destination = 'Mwanza, Tanzania';
@@ -104,9 +105,19 @@ class _DetailsPageState extends State<DetailsPage> {
       final data = response.data;
       if (data['routes'].isNotEmpty) {
         final points = data['routes'][0]['overview_polyline']['points'];
-        _polylineCoordinates = _decodePolyline(points);
-        setState(() {});
+        setState(() {
+          _polylineCoordinates = _decodePolyline(points);
+          _isLoading = false;  // Update loading state
+        });
+      } else {
+        setState(() {
+          _isLoading = false;  // Update loading state even if no route found
+        });
       }
+    } else {
+      setState(() {
+        _isLoading = false;  // Update loading state in case of error
+      });
     }
   }
 

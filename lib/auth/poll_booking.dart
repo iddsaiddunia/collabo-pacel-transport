@@ -7,11 +7,13 @@ final primaryColor = new ColorTheme();
 
 class PollBookingPage extends StatefulWidget {
   final String id;
+  final String companyId;
   final String from;
   final String to;
   const PollBookingPage({
     super.key,
     required this.id,
+    required this.companyId,
     required this.from,
     required this.to,
   });
@@ -21,11 +23,39 @@ class PollBookingPage extends StatefulWidget {
 }
 
 class _PollBookingPageState extends State<PollBookingPage> {
+  final TextEditingController _sizeController = TextEditingController();
   int _selectedIndex = 0;
   int _selectedPackageSizeIndex = 0;
   bool _isChecked = false;
-  double estimatedAmount = 1650.0;
+  double estimatedAmount = 0.0;
   bool isLoading = false;
+  double? chargesPerTon;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchChargesPerTon(widget.id);
+  }
+
+  Future<void> fetchChargesPerTon(String routeId) async {
+    try {
+      // Fetch the route document using routeId
+      DocumentSnapshot routeDoc = await FirebaseFirestore.instance
+          .collection('RoutesPolls')
+          .doc(routeId)
+          .get();
+
+      if (routeDoc.exists) {
+        setState(() {
+          chargesPerTon = routeDoc['chargesPerTon'];
+        });
+      } else {
+        throw Exception('Route not found');
+      }
+    } catch (e) {
+      print('Error fetching charges per ton: $e');
+    }
+  }
 
   void _onCheckboxChanged(bool? value) {
     setState(() {
@@ -34,15 +64,16 @@ class _PollBookingPageState extends State<PollBookingPage> {
   }
 
   List<String> packageTypeList = [
-    "Clothes",
     "Documents",
-    "Funicture",
+    "hardwares",
     "Electronics",
+    "Crops",
   ];
   List<String> packageSize = [
-    "20x20",
-    "20x40",
-    "40x40",
+    "Envelop",
+    "small box",
+    "medium box",
+    "large box",
     "other",
   ];
 
@@ -56,6 +87,25 @@ class _PollBookingPageState extends State<PollBookingPage> {
     setState(() {
       _selectedPackageSizeIndex = index;
     });
+  }
+
+  _calculatePrice() {
+    if (_selectedIndex == 0) {
+      if (_selectedPackageSizeIndex == 0 || _selectedPackageSizeIndex == 1) {
+        setState(() {
+          estimatedAmount = 5000.0;
+        });
+      } else {
+        setState(() {
+          estimatedAmount = 10000.0;
+        });
+      }
+    } else if (_selectedIndex == 1 || _selectedIndex == 3) {
+      double size = double.parse(_sizeController.text);
+      setState(() {
+        estimatedAmount = size * chargesPerTon!;
+      });
+    }
   }
 
   Future<void> requestRoutePoll({
@@ -91,6 +141,8 @@ class _PollBookingPageState extends State<PollBookingPage> {
         'packageType': packageType,
         'paymentStatus': paymentStatus,
         'paymentType': paymentType,
+        'depatureStatus': "waiting",
+        'cargoReceived': false,
         'routeId': routeId,
         'userId': userId,
         'createdAt': createdAt,
@@ -188,24 +240,39 @@ class _PollBookingPageState extends State<PollBookingPage> {
             SizedBox(
               height: 10,
             ),
-            Container(
-              width: double.infinity,
-              height: 120,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: packageSize.length,
-                itemBuilder: (context, index) {
-                  return PackageSize(
-                    title: packageSize[index],
-                    ontap: () {
-                      _selectPackageSize(index);
-                    },
-                    index: index,
-                    selectedIndex: _selectedPackageSizeIndex,
-                  );
-                },
-              ),
+            (_selectedIndex == 0)
+                ? Container(
+                    width: double.infinity,
+                    height: 120,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: packageSize.length,
+                      itemBuilder: (context, index) {
+                        return PackageSize(
+                          title: packageSize[index],
+                          ontap: () {
+                            _selectPackageSize(index);
+                          },
+                          index: index,
+                          selectedIndex: _selectedPackageSizeIndex,
+                        );
+                      },
+                    ),
+                  )
+                : Container(),
+            SizedBox(
+              height: 25.0,
             ),
+
+            (_selectedIndex != 0)
+                ? TextField(
+                    controller: _sizeController,
+                    decoration: InputDecoration(
+                      hintText: "specify size(Ton)",
+                      hintStyle: TextStyle(fontSize: 15),
+                    ),
+                  )
+                : Container(),
             SizedBox(
               height: 25.0,
             ),
@@ -252,14 +319,24 @@ class _PollBookingPageState extends State<PollBookingPage> {
                               fontWeight: FontWeight.w600,
                               color: color.primaryColor),
                         ),
-                        IconButton(
-                          onPressed: () {},
-                          icon: Icon(
-                            Icons.arrow_forward_ios,
-                            color: Colors.black26,
+                        MaterialButton(
+                          color: color.primaryColor,
+                          onPressed: () {
+                            _calculatePrice();
+                          },
+                          child: Text(
+                            "Generate",
+                            style: TextStyle(color: Colors.white, fontSize: 10),
                           ),
-                          iconSize: 20,
                         )
+                        // IconButton(
+                        //   onPressed: () {},
+                        //   icon: Icon(
+                        //     Icons.arrow_forward_ios,
+                        //     color: Colors.black26,
+                        //   ),
+                        //   iconSize: 20,
+                        // )
                       ])
                     ],
                   ),
@@ -286,11 +363,15 @@ class _PollBookingPageState extends State<PollBookingPage> {
                             iconSize: 20,
                           )
                         ],
-                      )
+                      ),
                     ],
-                  )
+                  ),
                 ],
               ),
+            ),
+            Text(
+              "Please make sure you checkin your order within 1 hr or will be cancelled",
+              style: TextStyle(fontWeight: FontWeight.w600),
             ),
             SizedBox(
               height: 20,
@@ -304,7 +385,7 @@ class _PollBookingPageState extends State<PollBookingPage> {
 
                 requestRoutePoll(
                   amount: estimatedAmount,
-                  companyID: "",
+                  companyID: widget.companyId,
                   isBreakable: _isChecked,
                   from: widget.from,
                   to: widget.to,

@@ -154,7 +154,7 @@ class _RoutesPollsPageState extends State<RoutesPollsPage> {
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) =>
-                                          PollBookingPage(id: routes[index].id, from : routes[index].from, to : routes[index].to),
+                                          PollBookingPage(id: routes[index].id, from : routes[index].from, to : routes[index].to, companyId: routes[index].companyID),
                                     ),
                                   );
                                 },

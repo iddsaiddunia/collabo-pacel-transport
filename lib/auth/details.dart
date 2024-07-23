@@ -1,16 +1,18 @@
-import 'package:dio/dio.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:pacel_trans_app/auth/routesPoll.dart';
 import 'package:pacel_trans_app/color_themes.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http;
+import 'package:google_polyline_algorithm/google_polyline_algorithm.dart';
+import 'dart:convert';
 
 class DetailsPage extends StatefulWidget {
-  final int id;
+  final String id;
   const DetailsPage({
     super.key,
     required this.id,
@@ -31,6 +33,17 @@ class _DetailsPageState extends State<DetailsPage> {
   String _currentAddress = 'Fetching current location...';
   Position? _currentPosition;
 
+  LatLng _initialPosition =
+      LatLng(-6.7924, 39.2083); // Dar es Salaam coordinates
+  List<LatLng> _polylineCoordinates = [];
+  bool _isLoading = true;
+
+  Set<Marker> _markers = {};
+  Set<Polyline> _polylines = {};
+  LatLngBounds? bounds;
+  List<LatLng> _routePoints = [];
+  String apiKey = 'AIzaSyAjsJbodhou5nNntMWPdhRsWqz2h1Tgzoc';
+
   // Format the DateTime object to a human-readable string.
   String formattedDate =
       '${DateTime(2024, 3, 12).year}-${DateTime(2024, 3, 12).month.toString().padLeft(2, '0')}-${DateTime(2024, 3, 12).day.toString().padLeft(2, '0')}';
@@ -42,9 +55,12 @@ class _DetailsPageState extends State<DetailsPage> {
     rootBundle.loadString('assets/map_style.txt').then((string) {
       _mapStyle = string;
     });
+
+    fetchRouteDetails(widget.id);
   }
 
   Future<void> _getCurrentLocation() async {
+    print("hello");
     final hasPermission = await _handleLocationPermission();
     if (!hasPermission) return;
 
@@ -84,79 +100,106 @@ class _DetailsPageState extends State<DetailsPage> {
     return status.isGranted;
   }
 
-  LatLng _initialPosition =
-      LatLng(-6.7924, 39.2083); // Dar es Salaam coordinates
-  List<LatLng> _polylineCoordinates = [];
-  final String _apiKey = 'AIzaSyAjsJbodhou5nNntMWPdhRsWqz2h1Tgzoc';
-  bool _isLoading = true;
+  Future<void> fetchRouteDetails(String routeId) async {
+    print("hello world");
+    try {
+      // Fetch the route document using routeId
+      DocumentSnapshot routeDoc = await FirebaseFirestore.instance
+          .collection('RoutesPolls')
+          .doc(routeId)
+          .get();
 
-  Future<void> _getPolyline() async {
-    const String _destination = 'Mwanza, Tanzania';
-    final response = await Dio().get(
-      'https://maps.googleapis.com/maps/api/directions/json',
-      queryParameters: {
-        'origin': 'Dar es Salaam, Tanzania',
-        'destination': _destination,
-        'key': _apiKey,
-      },
-    );
+      if (routeDoc.exists) {
+        String from = routeDoc['from'];
+        String to = routeDoc['to'];
+        List<dynamic> locationList = routeDoc['locationList'];
 
-    if (response.statusCode == 200) {
-      final data = response.data;
-      if (data['routes'].isNotEmpty) {
-        final points = data['routes'][0]['overview_polyline']['points'];
-        setState(() {
-          _polylineCoordinates = _decodePolyline(points);
-          _isLoading = false;  // Update loading state
-        });
+        List<String> addresses = [from, ...locationList.cast<String>(), to];
+        List<LatLng> coordinates = await geocodeAddresses(addresses);
+
+        print("$addresses ---->");
+
+        if (coordinates.length >= 2) {
+          setState(() {
+            _markers.add(Marker(
+              markerId: MarkerId('start'),
+              position: coordinates.first,
+              infoWindow: InfoWindow(title: 'Start'),
+            ));
+            _markers.add(Marker(
+              markerId: MarkerId('destination'),
+              position: coordinates.last,
+              infoWindow: InfoWindow(title: 'Destination'),
+            ));
+
+            for (int i = 1; i < coordinates.length - 1; i++) {
+              _markers.add(Marker(
+                markerId: MarkerId('location_$i'),
+                position: coordinates[i],
+                infoWindow: InfoWindow(title: 'Stop ${i + 1}'),
+              ));
+            }
+
+            bounds = LatLngBounds(
+              southwest: coordinates.reduce((a, b) => LatLng(
+                  a.latitude < b.latitude ? a.latitude : b.latitude,
+                  a.longitude < b.longitude ? a.longitude : b.longitude)),
+              northeast: coordinates.reduce((a, b) => LatLng(
+                  a.latitude > b.latitude ? a.latitude : b.latitude,
+                  a.longitude > b.longitude ? a.longitude : b.longitude)),
+            );
+
+            _drawRoute(coordinates.first, coordinates.last,
+                coordinates.sublist(1, coordinates.length - 1));
+          });
+        }
       } else {
-        setState(() {
-          _isLoading = false;  // Update loading state even if no route found
-        });
+        throw Exception('Route not found');
       }
-    } else {
-      setState(() {
-        _isLoading = false;  // Update loading state in case of error
-      });
+    } catch (e) {
+      print('Error fetching route details: $e');
     }
   }
 
-  List<LatLng> _decodePolyline(String polyline) {
+  Future<List<LatLng>> geocodeAddresses(List<String> addresses) async {
     List<LatLng> coordinates = [];
-    int index = 0, len = polyline.length;
-    int lat = 0, lng = 0;
-
-    while (index < len) {
-      int b, shift = 0, result = 0;
-      do {
-        b = polyline.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlat = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
-      lat += dlat;
-
-      shift = 0;
-      result = 0;
-      do {
-        b = polyline.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlng = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
-      lng += dlng;
-
-      coordinates.add(LatLng(lat / 1E5, lng / 1E5));
+    for (String address in addresses) {
+      List<Location> locations = await locationFromAddress(address);
+      if (locations.isNotEmpty) {
+        coordinates
+            .add(LatLng(locations.first.latitude, locations.first.longitude));
+      }
     }
-
     return coordinates;
   }
 
-  @override
-  void dispose() {
-    _mapController.dispose();
-    // _determinePosition();
-    super.dispose();
+  Future<void> _drawRoute(
+      LatLng start, LatLng end, List<LatLng> waypoints) async {
+    final String url =
+        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude},${end.longitude}&key=$apiKey';
+
+    final response = await http.get(Uri.parse(url));
+    final data = json.decode(response.body);
+
+    if (data['status'] == 'OK') {
+      final polylinePoints = data['routes'][0]['overview_polyline']['points'];
+      final List<List<num>> decodedPolyline = decodePolyline(polylinePoints);
+
+      List<LatLng> result = decodedPolyline
+          .map((point) => LatLng(point[0].toDouble(), point[1].toDouble()))
+          .toList();
+
+      setState(() {
+        _polylines.add(Polyline(
+          polylineId: PolylineId('route'),
+          points: result,
+          color: Colors.blue,
+          width: 5,
+        ));
+      });
+    } else {
+      throw Exception('Failed to load directions');
+    }
   }
 
   @override
@@ -179,27 +222,30 @@ class _DetailsPageState extends State<DetailsPage> {
                     onMapCreated: (GoogleMapController controller) {
                       _mapController = controller;
                     },
-                    polylines: {
-                      if (_polylineCoordinates.isNotEmpty)
-                        Polyline(
-                          polylineId: PolylineId('route'),
-                          points: _polylineCoordinates,
-                          color: Colors.blue,
-                          width: 5,
-                        ),
-                    },
-                    markers: {
-                      Marker(
-                        markerId: MarkerId('dar_es_salaam'),
-                        position: LatLng(-6.7924, 39.2083),
-                        infoWindow: InfoWindow(title: 'Dar es Salaam'),
-                      ),
-                      Marker(
-                        markerId: MarkerId('mwanza'),
-                        position: LatLng(-2.5163, 32.9175),
-                        infoWindow: InfoWindow(title: 'Mwanza'),
-                      ),
-                    },
+                    // polylines: {
+                    //   if (_polylineCoordinates.isNotEmpty)
+                    //     Polyline(
+                    //       polylineId: PolylineId('route'),
+                    //       points: _polylineCoordinates,
+                    //       color: Colors.blue,
+                    //       width: 5,
+                    //     ),
+                    // },
+                    // markers: {
+                    //   Marker(
+                    //     markerId: MarkerId('dar_es_salaam'),
+                    //     position: LatLng(-6.7924, 39.2083),
+                    //     infoWindow: InfoWindow(title: 'Dar es Salaam'),
+                    //   ),
+                    //   Marker(
+                    //     markerId: MarkerId('mwanza'),
+                    //     position: LatLng(-2.5163, 32.9175),
+                    //     infoWindow: InfoWindow(title: 'Mwanza'),
+                    //   ),
+                    // },
+
+                    markers: _markers,
+                    polylines: _polylines,
                   ),
           ),
           DraggableScrollableSheet(

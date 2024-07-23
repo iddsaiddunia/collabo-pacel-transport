@@ -64,11 +64,17 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<DocumentSnapshot> fetchLatestRequest() async {
+    var firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      throw Exception('User not logged in');
+    }
+
     CollectionReference requestPolls =
         FirebaseFirestore.instance.collection('LogisticOrders');
 
     QuerySnapshot querySnapshot = await requestPolls
-        .orderBy('createdAt', descending: true)
+        // .orderBy('createdAt', descending: true)
+        .where('userId', isEqualTo: firebaseUser.uid)
         .limit(1)
         .get();
 
@@ -187,8 +193,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 return Center(
                                     child: CircularProgressIndicator());
                               } else if (snapshot.hasError) {
-                                return Center(
-                                    child: Text('Error: ${snapshot.error}'));
+                                return Center(child: Text('${snapshot.error}'));
                               } else if (!snapshot.hasData ||
                                   snapshot.data == null) {
                                 return Center(child: Text('No requests found'));
@@ -458,11 +463,6 @@ class _DashboardPageState extends State<DashboardPage> {
                                   return ListView.builder(
                                     itemCount: logisticOrders.length,
                                     itemBuilder: (context, index) {
-                                      if (logisticOrders[index].orderStatus ==
-                                          "init") {
-                                        return SizedBox();
-                                      }
-
                                       return HistoryCard(
                                         orderNo: logisticOrders[index].orderNo,
                                         from: logisticOrders[index].from,
@@ -471,8 +471,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
-                                              builder: (context) =>
-                                                  const DetailsPage(id: 1),
+                                              builder: (context) => DetailsPage(
+                                                  id: logisticOrders[index]
+                                                      .routeId),
                                             ),
                                           );
                                         },
@@ -523,34 +524,164 @@ class _DashboardPageState extends State<DashboardPage> {
                                     itemBuilder: (context, index) {
                                       if (logisticOrders[index].orderStatus ==
                                           "pending") {
-                                        return SizedBox();
+                                        return HistoryCard(
+                                          orderNo:
+                                              logisticOrders[index].orderNo,
+                                          from: logisticOrders[index].from,
+                                          to: logisticOrders[index].to,
+                                          isPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    DetailsPage(
+                                                        id: logisticOrders[
+                                                                index]
+                                                            .routeId),
+                                              ),
+                                            );
+                                          },
+                                        );
                                       }
-
-                                      return HistoryCard(
-                                        orderNo: logisticOrders[index].orderNo,
-                                        from: logisticOrders[index].from,
-                                        to: logisticOrders[index].to,
-                                        isPressed: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  const DetailsPage(id: 1),
-                                            ),
-                                          );
-                                        },
-                                      );
+                                      return SizedBox();
                                     },
                                   );
                                 },
                               ),
                             ),
                           ),
-                          const CustomPage(
-                            content: Text('No orders on-progress'),
+                          CustomPage(
+                            content: Container(
+                              width: double.infinity,
+                              height: 240,
+                              // color: Colors.red,
+                              child: StreamBuilder<QuerySnapshot>(
+                                stream: FirebaseFirestore.instance
+                                    .collection('LogisticOrders')
+                                    .where('userId', isEqualTo: user.uid)
+                                    .snapshots(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasError) {
+                                    return Center(
+                                        child:
+                                            Text('Error: ${snapshot.error}'));
+                                  }
+
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  }
+
+                                  if (!snapshot.hasData ||
+                                      snapshot.data == null) {
+                                    return Center(
+                                        child: Text('No data available'));
+                                  }
+
+                                  final logisticOrders =
+                                      snapshot.data!.docs.map((doc) {
+                                    return LogisticOrder.fromDocument(doc);
+                                  }).toList();
+
+                                  return ListView.builder(
+                                    itemCount: logisticOrders.length,
+                                    itemBuilder: (context, index) {
+                                      if (logisticOrders[index].orderStatus ==
+                                          "ondelivery") {
+                                        return HistoryCard(
+                                          orderNo:
+                                              logisticOrders[index].orderNo,
+                                          from: logisticOrders[index].from,
+                                          to: logisticOrders[index].to,
+                                          isPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    DetailsPage(
+                                                        id: logisticOrders[
+                                                                index]
+                                                            .routeId),
+                                              ),
+                                            );
+                                          },
+                                        );
+                                      }
+                                      return SizedBox();
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
                           ),
-                          const CustomPage(
-                            content: Text('No orders delivered'),
+                          CustomPage(
+                            content: Container(
+                              width: double.infinity,
+                              height: 240,
+                              // color: Colors.red,
+                              child: StreamBuilder<QuerySnapshot>(
+                                stream: FirebaseFirestore.instance
+                                    .collection('LogisticOrders')
+                                    .where('userId', isEqualTo: user.uid)
+                                    .snapshots(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasError) {
+                                    return Center(
+                                        child:
+                                            Text('Error: ${snapshot.error}'));
+                                  }
+
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  }
+
+                                  if (!snapshot.hasData ||
+                                      snapshot.data == null) {
+                                    return Center(
+                                        child: Text('No data available'));
+                                  }
+
+                                  final logisticOrders =
+                                      snapshot.data!.docs.map((doc) {
+                                    return LogisticOrder.fromDocument(doc);
+                                  }).toList();
+
+                                  return ListView.builder(
+                                    itemCount: logisticOrders.length,
+                                    itemBuilder: (context, index) {
+                                      if (logisticOrders[index].orderStatus ==
+                                          "delivered") {
+                                        return HistoryCard(
+                                          orderNo:
+                                              logisticOrders[index].orderNo,
+                                          from: logisticOrders[index].from,
+                                          to: logisticOrders[index].to,
+                                          isPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    DetailsPage(
+                                                        id: logisticOrders[
+                                                                index]
+                                                            .routeId),
+                                              ),
+                                            );
+                                          },
+                                        );
+                                      }
+
+                                      return SizedBox();
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
                           ),
                         ],
                       ),

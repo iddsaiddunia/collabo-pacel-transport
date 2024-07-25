@@ -108,6 +108,41 @@ class _PollBookingPageState extends State<PollBookingPage> {
     }
   }
 
+  Future<double> fetchRemainingSpace(String routeId) async {
+    try {
+      // Reference to the RoutesPolls collection
+      final CollectionReference routesCollection =
+          FirebaseFirestore.instance.collection('RoutesPolls');
+
+      // Fetch the document with the specified routeId
+      DocumentSnapshot routeDoc = await routesCollection.doc(routeId).get();
+
+      // Check if the document exists
+      if (routeDoc.exists) {
+        // Extract remainingSpace from the document data
+        final data = routeDoc.data() as Map<String, dynamic>;
+        final remainingSpace = data['remainingSpace'];
+
+        // Check if remainingSpace is of type int or can be converted to int
+        // if (remainingSpace is int) {
+        //   return remainingSpace;
+        // } else if (remainingSpace is double) {
+        //   return remainingSpace.toInt();
+        // } else {
+        //   throw Exception('Invalid type for remainingSpace');
+        // }
+
+        return remainingSpace;
+      } else {
+        throw Exception('Route not found');
+      }
+    } catch (e) {
+      // Handle errors
+      print('Error fetching remainingSpace: $e');
+      throw e;
+    }
+  }
+
   Future<void> requestRoutePoll({
     required double amount,
     required String companyID,
@@ -128,66 +163,97 @@ class _PollBookingPageState extends State<PollBookingPage> {
       setState(() {
         isLoading = true;
       });
-      await FirebaseFirestore.instance.collection('LogisticOrders').add({
-        'amount': amount,
-        'approvalStatus': false,
-        'companyID': companyID,
-        'isBreakable': isBreakable,
-        'from': from,
-        'to': to,
-        'orderNo': orderNo,
-        'orderStatus': orderStatus,
-        'packageSize': packageSize,
-        'packageType': packageType,
-        'paymentStatus': paymentStatus,
-        'paymentType': paymentType,
-        'depatureStatus': "waiting",
-        'cargoReceived': false,
-        'routeId': routeId,
-        'userId': userId,
-        'createdAt': createdAt,
-      }).then((value) => {
-            value.update({'orderNo': value.id}),
-            setState(() {
-              isLoading = false;
-            }),
-            showDialog(
-              context: context,
-              builder: (BuildContext context) {
-                return AlertDialog(
-                  title: Text('Request Status'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                          'Initial order is placed successifully do checkin and payments within 1hour.'),
-                      SizedBox(
-                        height: 10.0,
-                      ),
-                      Column(
-                        children: [
-                          Text(
-                            'invoice number',
-                            style: TextStyle(fontSize: 18.0),
-                          ),
-                          Text(value.id),
-                        ],
+
+      double space = await fetchRemainingSpace(widget.id);
+
+      if (space < int.parse(_sizeController.text)) {
+        setState(() {
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("No enough space available"),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        double _remainingSpace = space - double.parse(_sizeController.text);
+
+        await FirebaseFirestore.instance.collection('LogisticOrders').add({
+          'amount': amount,
+          'approvalStatus': false,
+          'companyID': companyID,
+          'isBreakable': isBreakable,
+          'from': from,
+          'to': to,
+          'orderNo': orderNo,
+          'orderStatus': orderStatus,
+          'packageSize': packageSize,
+          'packageType': packageType,
+          'paymentStatus': paymentStatus,
+          'paymentType': paymentType,
+          'depatureStatus': "waiting",
+          'cargoReceived': false,
+          'routeId': routeId,
+          'userId': userId,
+          'createdAt': createdAt,
+        }).then((value) => {
+              value.update({'orderNo': value.id}),
+              setState(() {
+                isLoading = false;
+              }),
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: Text('Request Status'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                            'Initial order is placed successifully do checkin and payments within 1hour.'),
+                        SizedBox(
+                          height: 10.0,
+                        ),
+                        Column(
+                          children: [
+                            Text(
+                              'invoice number',
+                              style: TextStyle(fontSize: 18.0),
+                            ),
+                            Text(value.id),
+                          ],
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: Text('OK'),
                       ),
                     ],
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      child: Text('OK'),
-                    ),
-                  ],
-                );
-              },
-            )
+                  );
+                },
+              )
+            });
+
+        DocumentSnapshot routeSnapshot = await FirebaseFirestore.instance
+            .collection('RoutesPolls')
+            .doc(widget.id)
+            .get();
+        if (routeSnapshot.exists) {
+          // int remainingSpace = routeSnapshot['remainingSpace'] as int;
+          await FirebaseFirestore.instance
+              .collection('RoutesPolls')
+              .doc(routeId)
+              .update({
+            'remainingSpace': _remainingSpace, // Update remainingSpace
           });
-      print('Route poll added successfully');
+        }
+        print('Route poll added successfully');
+      }
     } catch (e) {
       print('Failed to add route poll: $e');
     }

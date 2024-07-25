@@ -91,6 +91,7 @@ class PollBox extends StatelessWidget {
   final String to;
   final double remainingCapacity;
   final Function()? ontap;
+  final Function()? viewRoute;
   const PollBox({
     super.key,
     required this.ontap,
@@ -100,6 +101,7 @@ class PollBox extends StatelessWidget {
     required this.from,
     required this.to,
     required this.remainingCapacity,
+    required this.viewRoute,
   });
 
   @override
@@ -177,6 +179,21 @@ class PollBox extends StatelessWidget {
                       style:
                           TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
                     ),
+                    GestureDetector(
+                      onTap: viewRoute,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 3.0, vertical: 2.0),
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                        ),
+                        child: Text(
+                          "View Route",
+                          style: TextStyle(
+                              fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    )
                   ],
                 ),
                 Column(
@@ -188,7 +205,7 @@ class PollBox extends StatelessWidget {
                           TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
                     ),
                     Text(
-                      "${remainingCapacity.toString()} Tons",
+                      "${remainingCapacity.toStringAsFixed(1)} Tons",
                       style:
                           TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
                     ),

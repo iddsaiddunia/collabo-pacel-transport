@@ -20,6 +20,37 @@ class _RoutesPollsPageState extends State<RoutesPollsPage> {
   final CollectionReference routesCollection =
       FirebaseFirestore.instance.collection('RoutesPolls');
 
+  void _showRouteDetails(BuildContext context, List<dynamic> locationList) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Route Details'),
+          content: Container(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: locationList.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title: Text(locationList[index]),
+                );
+              },
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Close'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -143,7 +174,7 @@ class _RoutesPollsPageState extends State<RoutesPollsPage> {
                             itemBuilder: (context, index) {
                               return PollBox(
                                 truckInfo: routes[index].trackInfo,
-                                companyName: routes[index].companyName,
+                                companyName: "",
                                 depatureDate:
                                     routes[index].departureTime.toDate(),
                                 from: routes[index].from,
@@ -153,10 +184,18 @@ class _RoutesPollsPageState extends State<RoutesPollsPage> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) =>
-                                          PollBookingPage(id: routes[index].id, from : routes[index].from, to : routes[index].to, companyId: routes[index].companyID),
+                                      builder: (context) => PollBookingPage(
+                                        id: routes[index].id,
+                                        from: routes[index].from,
+                                        to: routes[index].to,
+                                        companyId: routes[index].companyID,
+                                      ),
                                     ),
                                   );
+                                },
+                                viewRoute: () {
+                                  _showRouteDetails(
+                                      context, routes[index].route);
                                 },
                               );
                             },

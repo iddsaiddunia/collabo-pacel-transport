@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -8,14 +9,18 @@ import 'package:pacel_trans_app/color_themes.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
-import 'package:google_polyline_algorithm/google_polyline_algorithm.dart';
 import 'dart:convert';
 
 class DetailsPage extends StatefulWidget {
   final String id;
+  final String from;
+  final String to;
+
   const DetailsPage({
     super.key,
     required this.id,
+    required this.from,
+    required this.to,
   });
 
   @override
@@ -25,8 +30,6 @@ class DetailsPage extends StatefulWidget {
 class _DetailsPageState extends State<DetailsPage> {
   late GoogleMapController _mapController;
   DateTime march12_2024 = DateTime(2024, 3, 12);
-  // late Position _currentPosition;
-  // LatLng? _currentLatLng;
   late String _mapStyle;
 
   // LatLng _initialPosition = LatLng(0, 0);
@@ -40,9 +43,11 @@ class _DetailsPageState extends State<DetailsPage> {
 
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
-  LatLngBounds? bounds;
-  List<LatLng> _routePoints = [];
-  String apiKey = 'AIzaSyAjsJbodhou5nNntMWPdhRsWqz2h1Tgzoc';
+  late LatLng? _fromLatLng;
+  late LatLng? _toLatLng;
+  String? routeStatus;
+  int toggleTrack = 0;
+  String _apiKey = 'AIzaSyAjsJbodhou5nNntMWPdhRsWqz2h1Tgzoc';
 
   // Format the DateTime object to a human-readable string.
   String formattedDate =
@@ -56,11 +61,10 @@ class _DetailsPageState extends State<DetailsPage> {
       _mapStyle = string;
     });
 
-    fetchRouteDetails(widget.id);
+    _fetchOrderDetails();
   }
 
   Future<void> _getCurrentLocation() async {
-    print("hello");
     final hasPermission = await _handleLocationPermission();
     if (!hasPermission) return;
 
@@ -80,9 +84,11 @@ class _DetailsPageState extends State<DetailsPage> {
         CameraUpdate.newLatLng(_initialPosition),
       );
     } catch (e) {
-      setState(() {
-        _currentAddress = 'Error getting location: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _currentAddress = 'Error getting location: $e';
+        });
+      }
     }
   }
 
@@ -100,105 +106,150 @@ class _DetailsPageState extends State<DetailsPage> {
     return status.isGranted;
   }
 
-  Future<void> fetchRouteDetails(String routeId) async {
-    print("hello world");
+  Future<void> _fetchOrderDetails() async {
     try {
-      // Fetch the route document using routeId
-      DocumentSnapshot routeDoc = await FirebaseFirestore.instance
-          .collection('RoutesPolls')
-          .doc(routeId)
+      print('Fetching order details...');
+      // Fetch order details from LogisticOrders collection
+      DocumentSnapshot orderSnapshot = await FirebaseFirestore.instance
+          .collection('LogisticOrders')
+          .doc(widget.id)
           .get();
 
-      if (routeDoc.exists) {
-        String from = routeDoc['from'];
-        String to = routeDoc['to'];
-        List<dynamic> locationList = routeDoc['locationList'];
+      if (orderSnapshot.exists) {
+        var orderData = orderSnapshot.data() as Map<String, dynamic>;
+        String from = orderData['from'];
+        String to = orderData['to'];
+        String routeId = orderData['routeId'];
+        print('Order details fetched: from: $from, to: $to, routeId: $routeId');
 
-        List<String> addresses = [from, ...locationList.cast<String>(), to];
-        List<LatLng> coordinates = await geocodeAddresses(addresses);
+        // Convert addresses to LatLng
+        _fromLatLng = await _getLatLngFromAddress(from);
+        _toLatLng = await _getLatLngFromAddress(to);
 
-        print("$addresses ---->");
+        _markers.add(Marker(
+          markerId: MarkerId("start"),
+          position: _fromLatLng!,
+          infoWindow: InfoWindow(
+            title: 'start',
+          ),
+        ));
+        _markers.add(Marker(
+          markerId: MarkerId("destination"),
+          position: _toLatLng!,
+          infoWindow: InfoWindow(
+            title: 'start',
+          ),
+        ));
+        print(
+            'Converted addresses to LatLng: from: $_fromLatLng, to: $_toLatLng');
 
-        if (coordinates.length >= 2) {
-          setState(() {
+        // Fetch route from RoutesPolls collection
+        DocumentSnapshot routeSnapshot = await FirebaseFirestore.instance
+            .collection('RoutesPolls')
+            .doc(routeId)
+            .get();
+
+        if (routeSnapshot.exists) {
+          var routeData = routeSnapshot.data() as Map<String, dynamic>;
+          List<String> arrivedLocationList =
+              List<String>.from(routeData['ArrivedLocationList']);
+          print(
+              'Route details fetched with arrived locations: $arrivedLocationList');
+
+          if (mounted) {
+            setState(() {
+              routeStatus = routeData['depatureStatus'];
+            });
+          }
+          automateTrack();
+          // Convert arrived locations to LatLng and add markers
+          for (String location in arrivedLocationList) {
+            LatLng? latLng = await _getLatLngFromAddress(location);
             _markers.add(Marker(
-              markerId: MarkerId('start'),
-              position: coordinates.first,
-              infoWindow: InfoWindow(title: 'Start'),
+              markerId: MarkerId(location),
+              position: latLng!,
+              infoWindow:
+                  InfoWindow(title: 'Achieved Location', snippet: location),
             ));
-            _markers.add(Marker(
-              markerId: MarkerId('destination'),
-              position: coordinates.last,
-              infoWindow: InfoWindow(title: 'Destination'),
-            ));
+            print('Added marker for achieved location: $location -> $latLng');
+          }
 
-            for (int i = 1; i < coordinates.length - 1; i++) {
-              _markers.add(Marker(
-                markerId: MarkerId('location_$i'),
-                position: coordinates[i],
-                infoWindow: InfoWindow(title: 'Stop ${i + 1}'),
-              ));
-            }
-
-            bounds = LatLngBounds(
-              southwest: coordinates.reduce((a, b) => LatLng(
-                  a.latitude < b.latitude ? a.latitude : b.latitude,
-                  a.longitude < b.longitude ? a.longitude : b.longitude)),
-              northeast: coordinates.reduce((a, b) => LatLng(
-                  a.latitude > b.latitude ? a.latitude : b.latitude,
-                  a.longitude > b.longitude ? a.longitude : b.longitude)),
-            );
-
-            _drawRoute(coordinates.first, coordinates.last,
-                coordinates.sublist(1, coordinates.length - 1));
-          });
+          // Draw route on map
+          if (_fromLatLng != null && _toLatLng != null) {
+            await _drawRoute(_fromLatLng!, _toLatLng!);
+          } else {
+            print('Error: _fromLatLng or _toLatLng is null');
+          }
+        } else {
+          print('Route not found in RoutesPolls');
         }
       } else {
-        throw Exception('Route not found');
+        print('Order not found');
       }
     } catch (e) {
-      print('Error fetching route details: $e');
+      print('Error fetching order details: $e');
     }
   }
 
-  Future<List<LatLng>> geocodeAddresses(List<String> addresses) async {
-    List<LatLng> coordinates = [];
-    for (String address in addresses) {
-      List<Location> locations = await locationFromAddress(address);
-      if (locations.isNotEmpty) {
-        coordinates
-            .add(LatLng(locations.first.latitude, locations.first.longitude));
-      }
-    }
-    return coordinates;
-  }
-
-  Future<void> _drawRoute(
-      LatLng start, LatLng end, List<LatLng> waypoints) async {
+  Future<LatLng?> _getLatLngFromAddress(String address) async {
+    print('Converting address to LatLng: $address');
     final String url =
-        'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude},${end.longitude}&key=$apiKey';
-
+        'https://maps.googleapis.com/maps/api/geocode/json?address=$address&key=$_apiKey';
     final response = await http.get(Uri.parse(url));
     final data = json.decode(response.body);
 
     if (data['status'] == 'OK') {
-      final polylinePoints = data['routes'][0]['overview_polyline']['points'];
-      final List<List<num>> decodedPolyline = decodePolyline(polylinePoints);
+      final location = data['results'][0]['geometry']['location'];
+      LatLng latLng = LatLng(location['lat'], location['lng']);
+      print('Converted address to LatLng: $address -> $latLng');
+      return latLng;
+    } else {
+      print('Failed to get LatLng for address: $address');
+      return null;
+    }
+  }
 
-      List<LatLng> result = decodedPolyline
-          .map((point) => LatLng(point[0].toDouble(), point[1].toDouble()))
-          .toList();
+  Future<void> _drawRoute(LatLng start, LatLng end) async {
+    print('Drawing route from $start to $end');
+    final PolylinePoints polylinePoints = PolylinePoints();
+    final PolylineResult result =
+        await polylinePoints.getRouteBetweenCoordinates(
+      _apiKey,
+      PointLatLng(start.latitude, start.longitude),
+      PointLatLng(end.latitude, end.longitude),
+    );
 
+    if (result.points.isNotEmpty) {
       setState(() {
         _polylines.add(Polyline(
           polylineId: PolylineId('route'),
-          points: result,
+          points: result.points
+              .map((point) => LatLng(point.latitude, point.longitude))
+              .toList(),
           color: Colors.blue,
           width: 5,
         ));
       });
+      print('Route drawn successfully');
     } else {
+      print('Failed to load directions');
       throw Exception('Failed to load directions');
+    }
+  }
+
+  automateTrack() {
+    if (routeStatus == "waiting") {
+      setState(() {
+        toggleTrack = 0;
+      });
+    } else if (routeStatus == "depatured") {
+      setState(() {
+        toggleTrack = 1;
+      });
+    } else if (routeStatus == "arrived") {
+      setState(() {
+        toggleTrack = 2;
+      });
     }
   }
 
@@ -221,29 +272,34 @@ class _DetailsPageState extends State<DetailsPage> {
                     ),
                     onMapCreated: (GoogleMapController controller) {
                       _mapController = controller;
-                    },
-                    // polylines: {
-                    //   if (_polylineCoordinates.isNotEmpty)
-                    //     Polyline(
-                    //       polylineId: PolylineId('route'),
-                    //       points: _polylineCoordinates,
-                    //       color: Colors.blue,
-                    //       width: 5,
-                    //     ),
-                    // },
-                    // markers: {
-                    //   Marker(
-                    //     markerId: MarkerId('dar_es_salaam'),
-                    //     position: LatLng(-6.7924, 39.2083),
-                    //     infoWindow: InfoWindow(title: 'Dar es Salaam'),
-                    //   ),
-                    //   Marker(
-                    //     markerId: MarkerId('mwanza'),
-                    //     position: LatLng(-2.5163, 32.9175),
-                    //     infoWindow: InfoWindow(title: 'Mwanza'),
-                    //   ),
-                    // },
+                      controller.setMapStyle(_mapStyle);
 
+                      if (_fromLatLng != null && _toLatLng != null) {
+                        _mapController.animateCamera(
+                          CameraUpdate.newLatLngBounds(
+                            LatLngBounds(
+                              southwest: LatLng(
+                                _fromLatLng!.latitude < _toLatLng!.latitude
+                                    ? _fromLatLng!.latitude
+                                    : _toLatLng!.latitude,
+                                _fromLatLng!.longitude < _toLatLng!.longitude
+                                    ? _fromLatLng!.longitude
+                                    : _toLatLng!.longitude,
+                              ),
+                              northeast: LatLng(
+                                _fromLatLng!.latitude > _toLatLng!.latitude
+                                    ? _fromLatLng!.latitude
+                                    : _toLatLng!.latitude,
+                                _fromLatLng!.longitude > _toLatLng!.longitude
+                                    ? _fromLatLng!.longitude
+                                    : _toLatLng!.longitude,
+                              ),
+                            ),
+                            100.0,
+                          ),
+                        );
+                      }
+                    },
                     markers: _markers,
                     polylines: _polylines,
                   ),
@@ -366,22 +422,22 @@ class _DetailsPageState extends State<DetailsPage> {
                         children: [
                           TrackBox(
                             status: "Delivered for packing",
-                            location: "Kimara, Dar Es Salaam",
-                            currentStatus: 0,
+                            location: "${widget.from}",
+                            currentStatus: toggleTrack,
                             index: 0,
                             dueDate: formattedDate,
                           ),
                           TrackBox(
                             status: "Transit",
                             location: "Dodoma,Shinyanga,Mwanza",
-                            currentStatus: 0,
+                            currentStatus: toggleTrack,
                             index: 1,
                             dueDate: formattedDate,
                           ),
                           TrackBox(
                             status: "Arrival",
-                            location: "Mwanza",
-                            currentStatus: 0,
+                            location: "${widget.to}",
+                            currentStatus: toggleTrack,
                             index: 2,
                             dueDate: formattedDate,
                           ),

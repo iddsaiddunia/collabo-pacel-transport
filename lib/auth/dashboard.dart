@@ -463,21 +463,35 @@ class _DashboardPageState extends State<DashboardPage> {
                                   return ListView.builder(
                                     itemCount: logisticOrders.length,
                                     itemBuilder: (context, index) {
-                                      return HistoryCard(
-                                        orderNo: logisticOrders[index].orderNo,
-                                        from: logisticOrders[index].from,
-                                        to: logisticOrders[index].to,
-                                        isPressed: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => DetailsPage(
+                                      if (logisticOrders[index].orderStatus ==
+                                              "pending" ||
+                                          logisticOrders[index].orderStatus ==
+                                              "delivered" ||
+                                          logisticOrders[index].orderStatus ==
+                                              "ondelivery") {
+                                        return HistoryCard(
+                                          orderNo:
+                                              logisticOrders[index].orderNo,
+                                          from: logisticOrders[index].from,
+                                          to: logisticOrders[index].to,
+                                          isPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    DetailsPage(
                                                   id: logisticOrders[index]
-                                                      .routeId),
-                                            ),
-                                          );
-                                        },
-                                      );
+                                                      .orderNo,
+                                                  from: logisticOrders[index]
+                                                      .from,
+                                                  to: logisticOrders[index].to,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        );
+                                      }
+                                      return SizedBox();
                                     },
                                   );
                                 },
@@ -535,9 +549,12 @@ class _DashboardPageState extends State<DashboardPage> {
                                               MaterialPageRoute(
                                                 builder: (context) =>
                                                     DetailsPage(
-                                                        id: logisticOrders[
-                                                                index]
-                                                            .routeId),
+                                                  id: logisticOrders[index]
+                                                      .orderNo,
+                                                  from: logisticOrders[index]
+                                                      .from,
+                                                  to: logisticOrders[index].to,
+                                                ),
                                               ),
                                             );
                                           },
@@ -601,9 +618,12 @@ class _DashboardPageState extends State<DashboardPage> {
                                               MaterialPageRoute(
                                                 builder: (context) =>
                                                     DetailsPage(
-                                                        id: logisticOrders[
-                                                                index]
-                                                            .routeId),
+                                                  id: logisticOrders[index]
+                                                      .orderNo,
+                                                  from: logisticOrders[index]
+                                                      .from,
+                                                  to: logisticOrders[index].to,
+                                                ),
                                               ),
                                             );
                                           },
@@ -667,9 +687,12 @@ class _DashboardPageState extends State<DashboardPage> {
                                               MaterialPageRoute(
                                                 builder: (context) =>
                                                     DetailsPage(
-                                                        id: logisticOrders[
-                                                                index]
-                                                            .routeId),
+                                                  id: logisticOrders[index]
+                                                      .orderNo,
+                                                  from: logisticOrders[index]
+                                                      .from,
+                                                  to: logisticOrders[index].to,
+                                                ),
                                               ),
                                             );
                                           },
